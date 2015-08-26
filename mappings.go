@@ -98,7 +98,8 @@ func updateMirrorMappings(remoteLocation, localLocation string) bool {
 		return false
 	}
 
-	tempPath := os.TempDir() + base64.URLEncoding.EncodeToString(tempNameBuf) + ".json" // Add some random number to the end of here.
+	tempPath := localLocation + ".tmp" + base64.URLEncoding.EncodeToString(tempNameBuf)
+
 	log.Printf("TempPath= %s", tempPath)
 	var tempFile *os.File
 	if tempFile, err = os.Create(tempPath); err != nil {
