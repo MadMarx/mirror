@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
@@ -13,12 +14,19 @@ import (
 	"time"
 )
 
-type ReplacerPair struct {
-	inbound  *strings.Replacer
-	outbound *strings.Replacer
+type ProxyConfig struct {
+	Origin      string
+	Outbound    *strings.Replacer
+	Certificate *tls.Certificate
 }
 
-type Mappings map[string]*ReplacerPair
+type proxyConfigJSON struct {
+	Origin  string `json:"origin"`
+	CertPEM string `json:"cert"`
+	KeyPEM  string `json:"key"`
+}
+
+type Mappings map[string]*ProxyConfig
 
 type MappingsMutex struct {
 	sync.RWMutex
@@ -30,7 +38,7 @@ func loopUpdateMirrorMappings(server *ProxyServer, remoteLocation, localLocation
 		time.Sleep(interval)
 		if updateMirrorMappings(remoteLocation, localLocation) {
 			mappings := loadMirrorMappings(localLocation)
-			server.SetReplacers(mappings)
+			server.SetConfigurations(mappings)
 		}
 	}
 }
@@ -45,16 +53,26 @@ func loadMirrorMappings(localLocation string) (result Mappings) {
 	}
 
 	jsonParser := json.NewDecoder(cfgFile)
-	var settings = make(map[string]string, 0)
+	var settings = make(map[string]*proxyConfigJSON, 0)
 	if err = jsonParser.Decode(&settings); err != nil {
 		log.Printf("Unable to process the mappings file to read the config. %s", err.Error())
 		return
 	}
 
+	// Loop over the loaded JSON structure, to convert it into the correct objects.
+	// TODO move this into a property loader on the ProxyConfig object instead of
+	// using a different object for temporary parsing.
 	for key, val := range settings {
-		result[key] = &ReplacerPair{
-			inbound:  strings.NewReplacer(key, val),
-			outbound: strings.NewReplacer(val, key),
+		result[key] = &ProxyConfig{
+			Origin:   val.Origin,
+			Outbound: strings.NewReplacer(val.Origin, key),
+		}
+		if len(val.CertPEM) > 0 && len(val.KeyPEM) > 0 {
+			if cert, err := tls.X509KeyPair([]byte(val.CertPEM), []byte(val.KeyPEM)); err != nil {
+				log.Printf("%s->%s: Unable to process key pair. TLS is disabled. %s", key, val.Origin, err.Error())
+			} else {
+				result[key].Certificate = &cert
+			}
 		}
 	}
 
@@ -86,7 +104,7 @@ func updateMirrorMappings(remoteLocation, localLocation string) bool {
 
 	// We marshal the results into a map to make sure the results are
 	// going to load correctly at startup.
-	var settings map[string]string
+	var settings map[string]*proxyConfigJSON
 	if err = json.Unmarshal(body, &settings); err != nil {
 		log.Printf("Unable to parse the data to update the mappings file. %s", err.Error())
 		return false
@@ -100,7 +118,6 @@ func updateMirrorMappings(remoteLocation, localLocation string) bool {
 
 	tempPath := localLocation + ".tmp" + base64.URLEncoding.EncodeToString(tempNameBuf)
 
-	log.Printf("TempPath= %s", tempPath)
 	var tempFile *os.File
 	if tempFile, err = os.Create(tempPath); err != nil {
 		log.Printf("Unable to create the tempfile to write the mappings. %s", err.Error())

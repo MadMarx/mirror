@@ -139,7 +139,7 @@ function reload() {
 </script>
 <h1>Are you human?</h1>
 <p>This services is for humans only. Please verify you are not a bot by entering the numbers below:</p>
-<form action="." method="POST">
+<form action="." method="POST" autocomplete="off">
 <p><img id=image src="/captcha/{{.CaptchaId}}.png" alt="Captcha image"></p>
 <a href="#" onclick="reload()">Reload</a> | <a href="#" onclick="playAudio()">Play Audio</a>
 <audio id=audio controls style="display:none" src="/captcha/{{.CaptchaId}}.wav" preload=none>
@@ -147,7 +147,7 @@ function reload() {
   <a href="/captcha/{{.CaptchaId}}.wav">Download file</a> to play it in the external player.
 </audio>
 <input type="hidden" name="captchaId" value="{{.CaptchaId}}"><br>
-<input type="text" name="captchaSolution">
+<input type="text" name="captchaSolution" />
 <input type="submit" value="Submit">
 </form>
 <br/><br/>
