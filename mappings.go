@@ -18,14 +18,16 @@ import (
 
 type ProxyConfig struct {
 	Origin      string
+	OriginProto string
 	Outbound    *strings.Replacer
 	Certificate *tls.Certificate
 }
 
 type proxyConfigJSON struct {
-	Origin  string `json:"origin"`
-	CertPEM string `json:"cert"`
-	KeyPEM  string `json:"key"`
+	OriginProto string `json:"originproto"`
+	Origin      string `json:"origin"`
+	CertPEM     string `json:"cert"`
+	KeyPEM      string `json:"key"`
 }
 
 type Mappings map[string]*ProxyConfig
@@ -77,8 +79,9 @@ func loadMirrorMappings(localLocation string) (result Mappings) {
 	// using a different object for temporary parsing.
 	for key, val := range settings {
 		result[key] = &ProxyConfig{
-			Origin:   val.Origin,
-			Outbound: strings.NewReplacer(val.Origin, key),
+			Origin:      val.Origin,
+			OriginProto: val.OriginProto,
+			Outbound:    strings.NewReplacer(val.Origin, key),
 		}
 		if len(val.CertPEM) > 0 && len(val.KeyPEM) > 0 {
 			if cert, err := tls.X509KeyPair([]byte(val.CertPEM), []byte(val.KeyPEM)); err != nil {
