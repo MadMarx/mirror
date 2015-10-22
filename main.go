@@ -28,9 +28,13 @@ const GzipStreamsPoolSize = 20
 const GzipCompressionLevel = 3
 
 var remoteConfigFlag string
+var httpAddr string
+var tlsAddr string
 
 func init() {
 	flag.StringVar(&remoteConfigFlag, "config-url", MappingRemoteLocation, "The URL to periodically fetch configuration information from.")
+	flag.StringVar(&httpAddr, "http", ":http", "Address to listen for HTTP requests.")
+	flag.StringVar(&tlsAddr, "https", ":https", "Address to listen for HTTPS requests.")
 	flag.Parse()
 }
 
@@ -62,7 +66,7 @@ func main() {
 
 	// Create the HTTP server
 	httpServer := http.Server{
-		Addr:           ":http",
+		Addr:           httpAddr,
 		Handler:        myHandler,
 		ReadTimeout:    5 * time.Second,
 		WriteTimeout:   5 * time.Second,
@@ -86,7 +90,7 @@ func main() {
 		NextProtos: []string{"http/1.1"},
 	}
 	secureServer := http.Server{
-		Addr:           ":https",
+		Addr:           tlsAddr,
 		Handler:        myHandler,
 		ReadTimeout:    5 * time.Second,
 		WriteTimeout:   5 * time.Second,
