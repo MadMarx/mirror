@@ -9,8 +9,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -34,8 +36,19 @@ type MappingsMutex struct {
 }
 
 func loopUpdateMirrorMappings(server *ProxyServer, remoteLocation, localLocation string, interval time.Duration) {
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGHUP)
+
 	for {
-		time.Sleep(interval)
+		// Wake up either after the interval, or when we receive sighup.
+		select {
+		case <-sigChan:
+			break
+		case <-time.After(interval):
+			break
+		}
+
+		// Do the work.
 		if updateMirrorMappings(remoteLocation, localLocation) {
 			mappings := loadMirrorMappings(localLocation)
 			server.SetConfigurations(mappings)
