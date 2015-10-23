@@ -20,6 +20,7 @@ type ProxyConfig struct {
 	Origin      string
 	OriginProto string
 	Outbound    *strings.Replacer
+	Inbound     *strings.Replacer
 	Certificate *tls.Certificate
 }
 
@@ -82,6 +83,7 @@ func loadMirrorMappings(localLocation string) (result Mappings) {
 			Origin:      val.Origin,
 			OriginProto: val.OriginProto,
 			Outbound:    strings.NewReplacer(val.Origin, key),
+			Inbound:     strings.NewReplacer(key, val.Origin),
 		}
 		if len(val.CertPEM) > 0 && len(val.KeyPEM) > 0 {
 			if cert, err := tls.X509KeyPair([]byte(val.CertPEM), []byte(val.KeyPEM)); err != nil {

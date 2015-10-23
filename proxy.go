@@ -167,6 +167,14 @@ func (self *ProxyServer) ProcessRequest(response http.ResponseWriter, request *h
 	request.RequestURI = ""
 	request.Host = ""
 
+	if tmp := proxyConfig.Inbound.Replace(request.Referer()); tmp != request.Referer() {
+		if proxyConfig.OriginProto == "https" {
+			parts := strings.Split(tmp, "http")
+			tmp = strings.Join(parts, "https")
+		}
+		request.Header["Referer"][0] = tmp
+	}
+
 	// Do the request to the remote server
 	resp, err := self.Client.Do(request)
 	if err != nil {
@@ -201,6 +209,7 @@ func (self *ProxyServer) ProcessRequest(response http.ResponseWriter, request *h
 			} else {
 				v = proxyConfig.Outbound.Replace(v)
 			}
+
 			response.Header().Add(k, v)
 		}
 	}
