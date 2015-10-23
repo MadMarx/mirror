@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -26,9 +27,20 @@ const ByteBufferSize = 1 << 14
 const GzipStreamsPoolSize = 20
 const GzipCompressionLevel = 3
 
+var remoteConfigFlag string
+var httpAddr string
+var tlsAddr string
+
+func init() {
+	flag.StringVar(&remoteConfigFlag, "config-url", MappingRemoteLocation, "The URL to periodically fetch configuration information from.")
+	flag.StringVar(&httpAddr, "http", ":http", "Address to listen for HTTP requests.")
+	flag.StringVar(&tlsAddr, "https", ":https", "Address to listen for HTTPS requests.")
+	flag.Parse()
+}
+
 func main() {
 	// Don't care if this succeeds or not at this point.
-	updateMirrorMappings(MappingRemoteLocation, MappingLocalLocation)
+	updateMirrorMappings(remoteConfigFlag, MappingLocalLocation)
 
 	// Setup the primary server object.
 	replacers := loadMirrorMappings(MappingLocalLocation)
@@ -48,13 +60,13 @@ func main() {
 	myHandler.SetConfigurations(replacers)
 
 	// Setup the background mapping updater.
-	go loopUpdateMirrorMappings(myHandler, MappingRemoteLocation, MappingLocalLocation, MappingUpdateInterval)
+	go loopUpdateMirrorMappings(myHandler, remoteConfigFlag, MappingLocalLocation, MappingUpdateInterval)
 
 	// Create a waitgroup to prevent the main thread from exiting.
 
 	// Create the HTTP server
 	httpServer := http.Server{
-		Addr:           ":http",
+		Addr:           httpAddr,
 		Handler:        myHandler,
 		ReadTimeout:    5 * time.Second,
 		WriteTimeout:   5 * time.Second,
@@ -78,7 +90,7 @@ func main() {
 		NextProtos: []string{"http/1.1"},
 	}
 	secureServer := http.Server{
-		Addr:           ":https",
+		Addr:           tlsAddr,
 		Handler:        myHandler,
 		ReadTimeout:    5 * time.Second,
 		WriteTimeout:   5 * time.Second,

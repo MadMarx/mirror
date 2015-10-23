@@ -160,7 +160,7 @@ func (self *ProxyServer) ProcessRequest(response http.ResponseWriter, request *h
 
 	// Clean up the request for passing on to the next server.
 	request.URL.Scheme = "http"
-	if request.TLS != nil {
+	if request.TLS != nil || proxyConfig.OriginProto == "https" {
 		request.URL.Scheme = "https"
 	}
 	request.URL.Host = origin
@@ -194,6 +194,10 @@ func (self *ProxyServer) ProcessRequest(response http.ResponseWriter, request *h
 			if "Location" == k {
 				parts := strings.Split(v, proxyConfig.Origin)
 				v = strings.Join(parts, edge+edgePort)
+				if proxyConfig.OriginProto == "https" {
+					parts = strings.Split(v, "https://")
+					v = strings.Join(parts, "http://")
+				}
 			} else {
 				v = proxyConfig.Outbound.Replace(v)
 			}
@@ -240,6 +244,20 @@ func (self *ProxyServer) ProcessRequest(response http.ResponseWriter, request *h
 				pieces := bytes.Split(buffer[0:pos+gcount], []byte(proxyConfig.Origin))
 				if len(pieces) > 1 {
 					for _, chunk := range pieces[:len(pieces)-1] {
+						if proxyConfig.OriginProto == "https" {
+							protoOffset := bytes.LastIndex(chunk, []byte("https://"))
+							if protoOffset > -1 {
+								// The existance of any of these characters
+								// between the proto and the domain name
+								// imply we have gone past a single element
+								abortOffset := bytes.LastIndexAny(chunk[protoOffset:], "='\" <>")
+								if abortOffset == -1 {
+									// Getting pretty indented. should move it to a function.
+									gcount, err = outputStream.Write(chunk[:protoOffset+4])
+									chunk = chunk[protoOffset+5:]
+								}
+							}
+						}
 						gcount, err = outputStream.Write(chunk)
 						gcount, err = outputStream.Write([]byte(edge))
 						gcount, err = outputStream.Write([]byte(edgePort))
